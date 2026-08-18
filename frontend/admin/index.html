@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pañol · Mesa de Alumnado · UNRaf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   PANEL DE ALUMNADO — control de pañol
+   El gabinete sigue siendo el elemento firma, pero ahora cada
+   puerta muestra QUÉ guarda y CUÁNTO queda: la chapa lleva una
+   etiqueta de inventario, como el rótulo pegado en el mueble real.
+   ============================================================ */
+:root{
+  --cemento:#D7DBD2; --cemento-h:#C3C9BC; --panel:#F2F3EC;
+  --esmalte:#1F4C46; --esmalte-osc:#12302C;
+  --tinta:#14231F; --tinta-suave:#5A6660;
+  --ambar:#E8A317; --verde:#2F9E68; --cian:#2E8FB5; --alarma:#C0453B;
+  --radio:3px; --sombra:0 1px 0 rgba(20,35,31,.18), 0 8px 24px -14px rgba(20,35,31,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Archivo',system-ui,sans-serif;background:var(--cemento);color:var(--tinta);
+  min-height:100vh;font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.35;
+  background:repeating-linear-gradient(90deg,rgba(20,35,31,.03) 0 1px,transparent 1px 4px)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+
+/* ---------- Barra ---------- */
+.barra{display:flex;align-items:center;gap:24px;padding:14px 28px;background:var(--esmalte);
+  color:#EAF0EC;border-bottom:3px solid var(--ambar);position:relative;z-index:2}
+.marca{font-weight:800;letter-spacing:-.02em;font-size:18px}
+.marca span{display:block;font-weight:500;font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:#8FB3AA}
+.indicadores{margin-left:auto;display:flex;align-items:center;gap:22px;font-size:12px;color:#A9C6BE}
+.indicador b{display:block;font-family:'IBM Plex Mono',monospace;font-size:17px;color:#EAF0EC;font-weight:600}
+.latido{width:8px;height:8px;border-radius:50%;background:var(--verde);
+  box-shadow:0 0 0 0 rgba(47,158,104,.7);animation:latir 2.4s infinite;display:inline-block}
+.latido[data-off="1"]{background:var(--alarma);animation:none}
+@keyframes latir{70%{box-shadow:0 0 0 7px rgba(47,158,104,0)}100%{box-shadow:0 0 0 0 rgba(47,158,104,0)}}
+.sesion{display:flex;align-items:center;gap:12px;font-size:13px;color:#CFE0DA}
+.salir{background:none;border:1px solid #47756C;color:#CFE0DA;padding:5px 12px;
+  border-radius:var(--radio);cursor:pointer;font-family:inherit;font-size:12px}
+.salir:hover{background:#2B5E57}
+
+main{max-width:1240px;margin:0 auto;padding:24px 28px 56px;position:relative;z-index:1}
+.rotulo{font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--tinta-suave);font-weight:600;margin-bottom:10px}
+
+/* ---------- Solapas ---------- */
+.solapas{display:flex;gap:2px;margin-bottom:22px;border-bottom:1px solid var(--cemento-h)}
+.solapa{padding:11px 20px;border:none;background:none;font-family:inherit;font-size:14px;
+  font-weight:600;color:var(--tinta-suave);cursor:pointer;border-bottom:3px solid transparent;
+  margin-bottom:-1px}
+.solapa[aria-selected="true"]{color:var(--esmalte);border-bottom-color:var(--ambar)}
+
+/* ---------- Gabinete ---------- */
+.gabinete{background:var(--esmalte-osc);border:1px solid #0C221F;border-radius:6px;padding:18px;
+  box-shadow:inset 0 2px 12px rgba(0,0,0,.5),var(--sombra);margin-bottom:26px}
+.gabinete-cabecera{display:flex;justify-content:space-between;align-items:baseline;
+  color:#7FA79E;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  padding:0 4px 14px;font-weight:600}
+.puertas{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:1000px){.puertas{grid-template-columns:repeat(2,1fr)}}
+
+.puerta{background:#0A1C19;border-radius:4px;padding:6px;perspective:900px}
+.chapa{background:linear-gradient(160deg,#2A5D56 0%,var(--esmalte) 45%,#1A423D 100%);
+  border-radius:3px;padding:14px;transform-origin:left center;
+  transition:transform .5s cubic-bezier(.4,1.3,.5,1);position:relative;
+  box-shadow:0 2px 0 rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.09)}
+.rejilla{height:16px;border-radius:2px;margin-bottom:12px;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,.42) 0 3px,rgba(255,255,255,.05) 3px 4px,transparent 4px 7px);
+  box-shadow:inset 0 0 6px rgba(0,0,0,.4)}
+.placa{display:inline-block;background:#D8DCD3;color:#16302C;font-family:'IBM Plex Mono',monospace;
+  font-weight:600;font-size:17px;letter-spacing:.06em;padding:4px 10px;border-radius:2px;
+  box-shadow:inset 0 -1px 0 rgba(0,0,0,.25),0 1px 2px rgba(0,0,0,.4)}
+/* rótulo de contenido pegado en la puerta */
+.rotulo-material{margin-top:11px;background:rgba(0,0,0,.28);border-left:2px solid var(--ambar);
+  padding:7px 9px;border-radius:2px}
+.rotulo-material .nombre{font-size:12.5px;font-weight:600;color:#E4EEEA;line-height:1.3}
+.rotulo-material .categoria{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#8FB3AA;margin-top:2px}
+.lampara{position:absolute;top:12px;right:12px;width:13px;height:13px;border-radius:50%;
+  border:2px solid rgba(0,0,0,.45);background:#4A6A64;transition:background .3s}
+.puerta[data-estado="DISPONIBLE"] .lampara{background:var(--verde);box-shadow:0 0 10px var(--verde)}
+.puerta[data-estado="SIN_STOCK"] .lampara{background:var(--ambar);box-shadow:0 0 10px var(--ambar)}
+.puerta[data-estado="PUERTA_ABIERTA"] .lampara{background:var(--cian);box-shadow:0 0 12px var(--cian);animation:pulso 1.1s infinite}
+.puerta[data-estado="ERROR"] .lampara{background:var(--alarma);box-shadow:0 0 12px var(--alarma);animation:pulso .6s infinite}
+@keyframes pulso{50%{opacity:.25}}
+.puerta[data-estado="PUERTA_ABIERTA"] .chapa{transform:rotateY(-22deg) translateX(2px)}
+.puerta[data-estado="ERROR"] .chapa{background:linear-gradient(160deg,#5C3230,#3E211F)}
+
+.info{padding:12px 6px 4px;color:#B7CCC6}
+.info-estado{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.puerta[data-estado="DISPONIBLE"] .info-estado{color:var(--verde)}
+.puerta[data-estado="SIN_STOCK"] .info-estado{color:var(--ambar)}
+.puerta[data-estado="PUERTA_ABIERTA"] .info-estado{color:var(--cian)}
+.puerta[data-estado="ERROR"] .info-estado{color:#E5726A}
+/* medidor de stock */
+.medidor{margin-top:9px}
+.medidor-numeros{display:flex;justify-content:space-between;align-items:baseline;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;color:#93AEA8}
+.medidor-numeros b{font-size:20px;color:#E4EEEA;font-weight:600}
+.medidor-barra{height:7px;background:rgba(0,0,0,.45);border-radius:4px;margin-top:6px;display:flex;overflow:hidden}
+.medidor-barra i{height:100%;background:var(--verde);transition:width .5s}
+.medidor-barra i.afuera{background:rgba(255,255,255,.16)}
+/* rayado: reservado por solicitudes que todavía nadie aprobó */
+.medidor-barra i.reservado{background:repeating-linear-gradient(45deg,
+  var(--ambar) 0 3px, rgba(232,163,23,.35) 3px 6px)}
+.puerta[data-bajo="1"] .medidor-barra i:first-child{background:var(--ambar)}
+.puerta[data-estado="SIN_STOCK"] .medidor-barra i:first-child{background:var(--alarma)}
+.acciones{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.mini{flex:1;min-width:76px;font-family:inherit;font-size:11px;font-weight:600;padding:7px 6px;
+  border-radius:2px;cursor:pointer;border:1px solid #3A6A62;background:#173B37;color:#BFD6D0}
+.mini:hover{background:#22534C;color:#fff}
+.mini.urgente{border-color:#7A4A20;background:#3D2A11;color:#F0C169}
+.mini.urgente:hover{background:var(--ambar);color:#20140A}
+
+/* ---------- Cola de aprobación (lo primero que ve Alumnado) ---------- */
+.cola{background:var(--panel);border:1px solid var(--cemento-h);border-left:4px solid var(--ambar);
+  border-radius:var(--radio);padding:20px 22px;margin-bottom:26px;box-shadow:var(--sombra)}
+.cola[data-vacia="1"]{border-left-color:var(--cemento-h);opacity:.75}
+.cola-cabecera{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.cola-cabecera h2{font-size:17px;font-weight:700}
+.contador-cola{background:var(--ambar);color:#20140A;font-family:'IBM Plex Mono',monospace;
+  font-size:13px;font-weight:600;padding:1px 9px;border-radius:10px}
+.solicitudes{list-style:none;margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.solicitud{display:flex;align-items:center;gap:16px;padding:14px 16px;background:#fff;
+  border:1px solid var(--cemento-h);border-radius:2px}
+.solicitud[data-espera="mucha"]{border-left:3px solid var(--alarma)}
+.solicitud .cantidad{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;
+  min-width:44px;text-align:center;line-height:1}
+.solicitud .datos{flex:1;min-width:0}
+.solicitud .quien{font-weight:600;font-size:14.5px}
+.solicitud .que{font-size:13px;color:var(--tinta-suave);margin-top:2px}
+.solicitud .espera{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--tinta-suave);
+  margin-top:3px}
+.solicitud[data-espera="mucha"] .espera{color:var(--alarma);font-weight:600}
+.botones-cola{display:flex;gap:8px;flex:none}
+.aprobar{font-family:inherit;font-size:13px;font-weight:700;padding:10px 18px;border:none;
+  border-radius:2px;background:var(--verde);color:#fff;cursor:pointer;box-shadow:0 2px 0 #1E7049}
+.aprobar:hover{background:#37B378}
+.aprobar:active{transform:translateY(1px);box-shadow:0 1px 0 #1E7049}
+.rechazar{font-family:inherit;font-size:13px;font-weight:600;padding:10px 14px;
+  border:1px solid var(--cemento-h);border-radius:2px;background:none;color:var(--tinta-suave);cursor:pointer}
+.rechazar:hover{background:#F7E0DE;color:#8B2E27;border-color:#E0B4B0}
+.cola-vacia{font-size:13.5px;color:var(--tinta-suave);padding:6px 0}
+@media(max-width:700px){
+  .solicitud{flex-wrap:wrap}
+  .botones-cola{width:100%}
+  .aprobar,.rechazar{flex:1}
+}
+
+/* ---------- Fichas ---------- */
+.columnas{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media(max-width:900px){.columnas{grid-template-columns:1fr}}
+.ficha{background:var(--panel);border:1px solid var(--cemento-h);border-radius:var(--radio);
+  padding:22px;box-shadow:var(--sombra)}
+.ficha h2{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.ficha p.ayuda{font-size:12.5px;color:var(--tinta-suave);margin:2px 0 18px}
+
+.campo{margin-bottom:13px}
+.campo label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  font-weight:600;color:var(--tinta-suave);margin-bottom:5px}
+.campo input,.campo select,.campo textarea{width:100%;font-family:'IBM Plex Mono',monospace;
+  font-size:14px;padding:9px 11px;border:1px solid #B9BFB2;border-radius:2px;background:#fff;color:var(--tinta)}
+.campo textarea{min-height:96px;resize:vertical;line-height:1.5}
+.campo input:focus,.campo select:focus,.campo textarea:focus{outline:2px solid var(--esmalte);outline-offset:-1px}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.enviar{width:100%;margin-top:4px;padding:12px;font-family:inherit;font-size:14px;font-weight:700;
+  background:var(--esmalte);color:#fff;border:none;border-radius:2px;cursor:pointer;box-shadow:0 2px 0 #12302C}
+.enviar:hover{background:#286058}
+.enviar:active{transform:translateY(1px);box-shadow:0 1px 0 #12302C}
+.enviar.secundario{background:none;color:var(--esmalte);border:1px solid var(--esmalte);box-shadow:none}
+.enviar.secundario:hover{background:#E3E7DC}
+.aviso{margin-top:12px;font-size:13px;padding:10px 12px;border-radius:2px;display:none;white-space:pre-line}
+.aviso[data-tipo="ok"]{display:block;background:#DEF0E5;color:#1B5C3B;border-left:3px solid var(--verde)}
+.aviso[data-tipo="error"]{display:block;background:#F7E0DE;color:#8B2E27;border-left:3px solid var(--alarma)}
+
+/* ---------- Tablas ---------- */
+.barra-filtros{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.barra-filtros input,.barra-filtros select{font-family:'IBM Plex Mono',monospace;font-size:13px;
+  padding:8px 11px;border:1px solid #B9BFB2;border-radius:2px;background:#fff;color:var(--tinta)}
+.barra-filtros input{flex:1;min-width:190px}
+.tabla-caja{overflow-x:auto;border:1px solid var(--cemento-h);border-radius:2px;background:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--tinta-suave);font-weight:600;padding:11px 12px;background:#E8EBE1;
+  border-bottom:1px solid var(--cemento-h);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid #EDEFE6;vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.num{font-family:'IBM Plex Mono',monospace;font-weight:600}
+td.fechas{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--tinta-suave);white-space:nowrap}
+.pastilla{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;padding:2px 8px;border-radius:2px}
+.pastilla[data-estado="pendiente"]{background:#E8DFC0;color:#6B5A21}
+.pastilla[data-estado="activo"]{background:#FCEBCB;color:#8A5D07}
+.pastilla[data-estado="rechazado"]{background:#F7E0DE;color:#8B2E27}
+.pastilla[data-estado="caducado"]{background:#E4E7DC;color:#5A6660}
+.pastilla[data-estado="devuelto"]{background:#DEF0E5;color:#1B5C3B}
+.pastilla[data-estado="vencido"]{background:#F7E0DE;color:#8B2E27}
+.pastilla[data-rol="docente"]{background:#DCE9F2;color:#245B7A}
+.pastilla[data-rol="alumno"]{background:#E4E7DC;color:#4A5650}
+.accion-tabla{background:none;border:1px solid var(--cemento-h);border-radius:2px;
+  font-family:inherit;font-size:11.5px;padding:5px 10px;cursor:pointer;color:var(--tinta-suave)}
+.accion-tabla:hover{background:#E8EBE1;color:var(--tinta)}
+.vacio{color:var(--tinta-suave);font-size:13px;padding:26px;text-align:center}
+
+/* ---------- Bitácora ---------- */
+.bitacora{list-style:none;max-height:360px;overflow-y:auto}
+.bitacora li{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:9px 2px;
+  border-bottom:1px solid #E1E3D9;font-size:13px}
+.hora{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--tinta-suave)}
+.evento small{display:block;color:var(--tinta-suave);font-size:12px}
+
+/* ---------- Acceso ---------- */
+.acceso{position:fixed;inset:0;background:var(--esmalte-osc);z-index:20;display:grid;place-items:center;padding:20px}
+.acceso[hidden]{display:none}
+.acceso-caja{background:var(--panel);padding:32px;border-radius:var(--radio);width:100%;max-width:360px;
+  box-shadow:0 20px 60px -20px rgba(0,0,0,.6)}
+.acceso-caja h1{font-size:20px;margin-bottom:4px}
+.acceso-caja p.ayuda{margin-bottom:20px}
+.demo-nota{margin-top:16px;font-size:12px;color:var(--tinta-suave);
+  border-top:1px dashed var(--cemento-h);padding-top:12px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ ACCESO ============ -->
+<div class="acceso" id="acceso">
+  <form class="acceso-caja" id="formAcceso">
+    <h1>Mesa de Alumnado</h1>
+    <p class="ayuda">Control de pañol — Universidad Nacional de Rafaela</p>
+    <div class="campo"><label for="usuario">Usuario</label>
+      <input id="usuario" value="alumnado" autocomplete="username" required></div>
+    <div class="campo"><label for="clave">Contraseña</label>
+      <input id="clave" type="password" value="unraf2025" autocomplete="current-password" required></div>
+    <button class="enviar" type="submit">Entrar</button>
+    <div class="aviso" id="avisoAcceso"></div>
+    <p class="demo-nota">Si el servidor no responde, el panel entra en modo demo con datos simulados.</p>
+  </form>
+</div>
+
+<!-- ============ APLICACIÓN ============ -->
+<header class="barra">
+  <div class="marca">UNRaf<span>Pañol inteligente</span></div>
+  <div class="indicadores">
+    <div class="indicador"><b id="mSolicitudes">—</b>por aprobar</div>
+    <div class="indicador"><b id="mUnidades">—</b>unidades afuera</div>
+    <div class="indicador"><b id="mPrestamos">—</b>préstamos activos</div>
+    <div class="indicador"><b id="mVencidos">—</b>vencidos</div>
+    <div><span class="latido" id="latido"></span> <span class="mono" id="estadoEnlace">Enlace LoRa —</span></div>
+  </div>
+  <div class="sesion"><span id="nombreUsuario">—</span><button class="salir" id="btnSalir">Salir</button></div>
+</header>
+
+<main>
+  <div class="solapas" role="tablist">
+    <button class="solapa" id="tabPanol" role="tab" aria-selected="true">Pañol</button>
+    <button class="solapa" id="tabMovimientos" role="tab" aria-selected="false">Movimientos</button>
+    <button class="solapa" id="tabPersonas" role="tab" aria-selected="false">Personas</button>
+  </div>
+
+  <!-- ---- PAÑOL ---- -->
+  <section id="vistaPanol">
+    <!-- La cola va primero: es lo que Alumnado tiene que resolver ahora -->
+    <section class="cola" id="cola" data-vacia="1">
+      <div class="cola-cabecera">
+        <h2>Solicitudes por aprobar</h2>
+        <span class="contador-cola" id="contadorCola" hidden>0</span>
+      </div>
+      <p class="ayuda" style="margin:0">Nadie retira material hasta que alguien de Alumnado apruebe.</p>
+      <ul class="solicitudes" id="listaSolicitudes"></ul>
+    </section>
+
+    <p class="rotulo">Inventario en tiempo real</p>
+    <div class="gabinete">
+      <div class="gabinete-cabecera">
+        <span>Gabinete A · Pañol planta baja</span>
+        <span class="mono" id="selloActualizacion">—</span>
+      </div>
+      <div class="puertas" id="puertas"></div>
+    </div>
+
+    <div class="columnas">
+      <section class="ficha">
+        <h2>Cargar material en un casillero</h2>
+        <p class="ayuda">Definí qué guarda cada casillero y cuántas unidades debería haber adentro.</p>
+        <form id="formInventario">
+          <div class="campo"><label for="invCasillero">Casillero</label>
+            <select id="invCasillero" required></select></div>
+          <div class="campo"><label for="invItem">Material</label>
+            <select id="invItem" required></select></div>
+          <div class="dos">
+            <div class="campo"><label for="invTotal">Stock total</label>
+              <input id="invTotal" type="number" min="0" value="25" required></div>
+            <div class="campo"><label for="invUmbral">Avisar cuando queden</label>
+              <input id="invUmbral" type="number" min="0" value="5" required></div>
+          </div>
+          <button class="enviar" type="submit">Guardar inventario</button>
+          <div class="aviso" id="avisoInventario"></div>
+        </form>
+      </section>
+
+      <section class="ficha">
+        <h2>Bitácora</h2>
+        <p class="ayuda">Cada apertura, retiro y devolución, con quién la hizo.</p>
+        <ul class="bitacora" id="bitacora"><li class="vacio">Sin movimientos todavía</li></ul>
+      </section>
+    </div>
+  </section>
+
+  <!-- ---- MOVIMIENTOS ---- -->
+  <section id="vistaMovimientos" hidden>
+    <section class="ficha">
+      <h2>Trazabilidad de préstamos</h2>
+      <p class="ayuda">Quién pidió qué, cuánto, cuándo lo retiró y cuándo lo devolvió.</p>
+      <div class="barra-filtros">
+        <input id="buscarPrestamo" placeholder="Buscar por legajo, nombre o material">
+        <select id="filtroEstado">
+          <option value="todos">Todos</option>
+          <option value="pendiente">Esperando aprobación</option>
+          <option value="activo">Sin devolver</option>
+          <option value="devuelto">Devueltos</option>
+          <option value="rechazado">Rechazados</option>
+        </select>
+      </div>
+      <div class="tabla-caja">
+        <table>
+          <thead><tr>
+            <th>Persona</th><th>Material</th><th>Cant.</th>
+            <th>Retiro</th><th>Devolución</th><th>Aprobó</th><th>Estado</th><th></th>
+          </tr></thead>
+          <tbody id="cuerpoPrestamos"></tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+
+  <!-- ---- PERSONAS ---- -->
+  <section id="vistaPersonas" hidden>
+    <div class="columnas">
+      <section class="ficha">
+        <h2>Registrar persona</h2>
+        <p class="ayuda">Alumnos y docentes usan el mismo padrón: el rol cambia cuánto pueden retirar.</p>
+        <form id="formPersona">
+          <div class="campo"><label for="pLegajo">Legajo</label>
+            <input id="pLegajo" inputmode="numeric" placeholder="10234" required></div>
+          <div class="campo"><label for="pNombre">Nombre completo</label>
+            <input id="pNombre" placeholder="Bertola, Juan" required></div>
+          <div class="dos">
+            <div class="campo"><label for="pPin">PIN (4 a 6 dígitos)</label>
+              <input id="pPin" inputmode="numeric" placeholder="4821" required></div>
+            <div class="campo"><label for="pRol">Rol</label>
+              <select id="pRol"><option value="alumno">Alumno · 5 u. / 24 h</option>
+                <option value="docente">Docente · 25 u. / 7 días</option></select></div>
+          </div>
+          <button class="enviar" type="submit">Registrar</button>
+          <div class="aviso" id="avisoPersona"></div>
+        </form>
+
+        <h2 style="margin-top:26px">Alta masiva</h2>
+        <p class="ayuda">Pegá una línea por persona: legajo, nombre, PIN, rol</p>
+        <form id="formImportar">
+          <div class="campo">
+            <textarea id="textoImportar" placeholder="10234, Bertola Juan, 4821, alumno&#10;20011, Sosa Martin, 1145, docente"></textarea>
+          </div>
+          <button class="enviar secundario" type="submit">Importar lista</button>
+          <div class="aviso" id="avisoImportar"></div>
+        </form>
+      </section>
+
+      <section class="ficha">
+        <h2>Padrón</h2>
+        <p class="ayuda">Quién está habilitado y cuánto material tiene en su poder.</p>
+        <div class="barra-filtros"><input id="buscarPersona" placeholder="Buscar por legajo o nombre"></div>
+        <div class="tabla-caja">
+          <table>
+            <thead><tr><th>Legajo</th><th>Nombre</th><th>Rol</th><th>Afuera</th><th></th></tr></thead>
+            <tbody id="cuerpoPersonas"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ============================================================
+   PANEL DE ALUMNADO — cliente
+   El stock que se ve acá siempre viene del servidor: el frontend
+   nunca suma ni resta unidades por su cuenta.
+   ============================================================ */
+const API = location.protocol.startsWith('http') ? location.origin + '/api' : 'http://localhost:3000/api';
+
+const estado = {
+  token: null, usuario: null,
+  casilleros: [], items: [], prestamos: [], personas: [], eventos: [], solicitudes: [],
+  resumen: { solicitudesPendientes: 0, prestamosActivos: 0, unidadesAfuera: 0, vencidos: 0 },
+  demo: false, ws: null,
+};
+
+const $ = (id) => document.getElementById(id);
+
+function mostrarAviso(elemento, texto, tipo) {
+  elemento.textContent = texto;
+  elemento.dataset.tipo = tipo;
+  if (tipo === 'ok') setTimeout(() => elemento.removeAttribute('data-tipo'), 5000);
+}
+
+const fecha = (iso) => iso
+  ? new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+  : '—';
+const hora = (iso) => new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+async function api(ruta, opciones = {}) {
+  const respuesta = await fetch(API + ruta, {
+    ...opciones,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(estado.token ? { Authorization: `Bearer ${estado.token}` } : {}),
+      ...(opciones.headers || {}),
+    },
+  });
+  const datos = await respuesta.json().catch(() => ({}));
+  if (!respuesta.ok) throw new Error(datos.error || `Error ${respuesta.status}`);
+  return datos;
+}
+
+/* ---------- Acceso ---------- */
+$('formAcceso').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const datos = await api('/auth/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ usuario: $('usuario').value, password: $('clave').value }),
+    });
+    estado.token = datos.token;
+    estado.usuario = datos.usuario.nombre;
+    iniciar();
+  } catch (error) {
+    if (error instanceof TypeError) { estado.demo = true; estado.usuario = 'Mesa de Alumnado (demo)'; iniciar(); }
+    else mostrarAviso($('avisoAcceso'), error.message, 'error');
+  }
+});
+
+$('btnSalir').addEventListener('click', () => location.reload());
+
+async function iniciar() {
+  $('acceso').hidden = true;
+  $('nombreUsuario').textContent = estado.usuario;
+  if (estado.demo) {
+    cargarDemo();
+    $('estadoEnlace').textContent = 'Modo demo · sin backend';
+    $('latido').dataset.off = '1';
+  } else {
+    await refrescar();
+    conectarWebSocket();
+    setInterval(refrescar, 20000);
+  }
+}
+
+/* ---------- Solapas ---------- */
+const solapas = { panol: 'vistaPanol', movimientos: 'vistaMovimientos', personas: 'vistaPersonas' };
+$('tabPanol').addEventListener('click', () => cambiarSolapa('panol'));
+$('tabMovimientos').addEventListener('click', () => cambiarSolapa('movimientos'));
+$('tabPersonas').addEventListener('click', () => cambiarSolapa('personas'));
+
+function cambiarSolapa(cual) {
+  for (const [nombre, vista] of Object.entries(solapas)) {
+    const activa = nombre === cual;
+    $(vista).hidden = !activa;
+    $('tab' + nombre.charAt(0).toUpperCase() + nombre.slice(1)).setAttribute('aria-selected', String(activa));
+  }
+  if (cual === 'movimientos') cargarPrestamos();
+  if (cual === 'personas') cargarPersonas();
+}
+
+/* ---------- Datos ---------- */
+async function refrescar() {
+  if (estado.demo) { dibujarTodo(); return; }
+  try {
+    const [casilleros, items, eventos, solicitudes] = await Promise.all([
+      api('/admin/casilleros'), api('/admin/items'),
+      api('/admin/eventos?limite=25'), api('/admin/solicitudes'),
+    ]);
+    estado.casilleros = casilleros.casilleros;
+    estado.resumen = solicitudes.resumen;
+    estado.items = items.items;
+    estado.eventos = eventos.eventos;
+    estado.solicitudes = solicitudes.solicitudes;
+    dibujarTodo();
+  } catch {
+    $('estadoEnlace').textContent = 'Sin conexión con el servidor';
+    $('latido').dataset.off = '1';
+  }
+}
+
+async function cargarPrestamos() {
+  if (estado.demo) { dibujarPrestamos(); return; }
+  try {
+    const datos = await api(`/admin/prestamos?estado=${$('filtroEstado').value}&buscar=${encodeURIComponent($('buscarPrestamo').value)}`);
+    estado.prestamos = datos.prestamos;
+    estado.resumen = datos.resumen;
+    dibujarPrestamos();
+    dibujarResumen();
+  } catch (error) {
+    $('cuerpoPrestamos').innerHTML = `<tr><td colspan="8" class="vacio">${error.message}</td></tr>`;
+  }
+}
+
+async function cargarPersonas() {
+  if (estado.demo) { dibujarPersonas(); return; }
+  try {
+    estado.personas = (await api(`/admin/usuarios?buscar=${encodeURIComponent($('buscarPersona').value)}`)).usuarios;
+    dibujarPersonas();
+  } catch (error) {
+    $('cuerpoPersonas').innerHTML = `<tr><td colspan="5" class="vacio">${error.message}</td></tr>`;
+  }
+}
+
+function conectarWebSocket() {
+  const url = API.replace(/^http/, 'ws').replace(/\/api$/, '') + `/ws?token=${estado.token}`;
+  const ws = new WebSocket(url);
+  estado.ws = ws;
+  ws.onmessage = (mensaje) => {
+    const { evento, datos } = JSON.parse(mensaje.data);
+    if (evento === 'casillero.actualizado') {
+      estado.casilleros = estado.casilleros.map((c) => (c.id === datos.id ? datos : c));
+      dibujarGabinete();
+    }
+    // Una solicitud nueva tiene que aparecer sin que nadie refresque: si
+    // Alumnado no la ve, la persona se queda esperando frente al casillero.
+    if (evento === 'solicitud.nueva' || evento === 'solicitud.resuelta') {
+      refrescar();
+      if (evento === 'solicitud.nueva') avisarSonido();
+    }
+  };
+  ws.onclose = () => setTimeout(conectarWebSocket, 4000);
+}
+
+/* ---------- Render ---------- */
+const ETIQUETAS = {
+  DISPONIBLE: 'Disponible', SIN_STOCK: 'Sin stock',
+  PUERTA_ABIERTA: 'Puerta abierta', ERROR: 'Trabado / Error',
+};
+
+function dibujarTodo() {
+  dibujarCola();
+  dibujarGabinete();
+  dibujarSelectores();
+  dibujarBitacora();
+  dibujarResumen();
+}
+
+function dibujarResumen() {
+  $('mSolicitudes').textContent = estado.resumen.solicitudesPendientes ?? 0;
+  $('mUnidades').textContent = estado.resumen.unidadesAfuera;
+  $('mPrestamos').textContent = estado.resumen.prestamosActivos;
+  $('mVencidos').textContent = estado.resumen.vencidos;
+}
+
+/** La cola de aprobación: lo primero que mira Alumnado al entrar. */
+function dibujarCola() {
+  const lista = $('listaSolicitudes');
+  const cantidad = estado.solicitudes.length;
+
+  $('cola').dataset.vacia = cantidad ? '0' : '1';
+  $('contadorCola').hidden = !cantidad;
+  $('contadorCola').textContent = cantidad;
+  document.title = cantidad ? `(${cantidad}) Pañol · Alumnado` : 'Pañol · Mesa de Alumnado · UNRaf';
+
+  if (!cantidad) {
+    lista.innerHTML = '<li class="cola-vacia">No hay solicitudes esperando. Todo al día.</li>';
+    return;
+  }
+
+  lista.innerHTML = '';
+  for (const solicitud of estado.solicitudes) {
+    const espera = solicitud.minutosEsperando ?? 0;
+    const fila = document.createElement('li');
+    fila.className = 'solicitud';
+    // Más de 5 minutos esperando: alguien está parado frente al casillero.
+    fila.dataset.espera = espera >= 5 ? 'mucha' : 'poca';
+    fila.innerHTML = `
+      <span class="cantidad">${solicitud.cantidad}</span>
+      <span class="datos">
+        <span class="quien">${solicitud.usuario.nombre}
+          <span class="pastilla" data-rol="${solicitud.usuario.rol}">${solicitud.usuario.rol}</span></span>
+        <div class="que">${solicitud.item.nombre} · casillero ${solicitud.casillero.codigo}</div>
+        <div class="espera">legajo ${solicitud.usuario.legajo} · esperando ${espera} min</div>
+      </span>
+      <span class="botones-cola">
+        <button class="aprobar">Aprobar y abrir</button>
+        <button class="rechazar">Rechazar</button>
+      </span>`;
+    fila.querySelector('.aprobar').addEventListener('click', () => aprobar(solicitud));
+    fila.querySelector('.rechazar').addEventListener('click', () => rechazar(solicitud));
+    lista.appendChild(fila);
+  }
+}
+
+/** Aviso corto cuando entra una solicitud: el mostrador no siempre mira la pantalla. */
+function avisarSonido() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const vol = ctx.createGain();
+    osc.frequency.value = 880;
+    vol.gain.setValueAtTime(0.08, ctx.currentTime);
+    vol.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.connect(vol).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  } catch { /* si el navegador no deja sonar, no pasa nada */ }
+}
+
+function dibujarGabinete() {
+  const contenedor = $('puertas');
+  contenedor.innerHTML = '';
+
+  for (const casillero of estado.casilleros) {
+    const inv = casillero.inventario;
+    const porcentaje = (n) => (inv.total ? (n / inv.total) * 100 : 0);
+
+    const puerta = document.createElement('article');
+    puerta.className = 'puerta';
+    puerta.dataset.estado = casillero.estado;
+    puerta.dataset.bajo = inv.stockBajo ? '1' : '0';
+
+    puerta.innerHTML = `
+      <div class="chapa">
+        <span class="lampara"></span>
+        <div class="rejilla"></div>
+        <span class="placa">${casillero.codigo}</span>
+        <div class="rotulo-material">
+          <div class="nombre">${casillero.item ? casillero.item.nombre : 'Sin material cargado'}</div>
+          <div class="categoria">${casillero.item ? casillero.item.categoria || 'General' : 'vacío'}</div>
+        </div>
+      </div>
+      <div class="info">
+        <div class="info-estado">${ETIQUETAS[casillero.estado]}</div>
+        <div class="medidor">
+          <div class="medidor-numeros">
+            <span><b>${inv.disponible}</b> / ${inv.total}</span>
+            <span>${inv.prestado} afuera${inv.reservado ? ` · ${inv.reservado} reservado` : ''}</span>
+          </div>
+          <div class="medidor-barra">
+            <i style="width:${porcentaje(inv.disponible)}%"></i>
+            <i class="afuera" style="width:${porcentaje(inv.prestado)}%"></i>
+            <i class="reservado" style="width:${porcentaje(inv.reservado || 0)}%"></i>
+          </div>
+        </div>
+        <div class="acciones">
+          <button class="mini urgente" data-accion="abrir">Abrir</button>
+          <button class="mini" data-accion="reponer">Reponer</button>
+          ${casillero.estado === 'ERROR' ? '<button class="mini" data-accion="servicio">Dar de alta</button>' : ''}
+        </div>
+      </div>`;
+
+    puerta.querySelector('[data-accion="abrir"]').addEventListener('click', () => aperturaEmergencia(casillero));
+    puerta.querySelector('[data-accion="reponer"]').addEventListener('click', () => reponerStock(casillero));
+    puerta.querySelector('[data-accion="servicio"]')?.addEventListener('click', () => reponerServicio(casillero));
+    contenedor.appendChild(puerta);
+  }
+  $('selloActualizacion').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-AR');
+
+  const nodo = estado.casilleros[0]?.nodo;
+  if (nodo && !estado.demo) {
+    $('estadoEnlace').textContent = `${nodo.codigo} · ${nodo.rssi ?? '—'} dBm`;
+    $('latido').dataset.off = nodo.offline ? '1' : '0';
+  }
+}
+
+function dibujarSelectores() {
+  $('invCasillero').innerHTML = estado.casilleros
+    .map((c) => `<option value="${c.id}">${c.codigo}${c.item ? ` — ${c.item.nombre}` : ' — vacío'}</option>`).join('');
+  $('invItem').innerHTML = estado.items
+    .map((i) => `<option value="${i.id}">${i.nombre} (${i.codigo})</option>`).join('');
+}
+
+function dibujarBitacora() {
+  const lista = $('bitacora');
+  if (!estado.eventos.length) { lista.innerHTML = '<li class="vacio">Sin movimientos todavía</li>'; return; }
+  lista.innerHTML = estado.eventos.map((e) => `<li>
+      <span class="hora">${hora(e.creado_en)}</span>
+      <span class="evento"><b>${e.casillero || 'Sistema'}</b> · ${e.tipo.replaceAll('_', ' ').toLowerCase()}
+        <small>${[e.actor, e.detalle].filter(Boolean).join(' · ')}</small></span>
+    </li>`).join('');
+}
+
+function dibujarPrestamos() {
+  const cuerpo = $('cuerpoPrestamos');
+  if (!estado.prestamos.length) {
+    cuerpo.innerHTML = '<tr><td colspan="8" class="vacio">No hay préstamos que coincidan</td></tr>';
+    return;
+  }
+  cuerpo.innerHTML = '';
+  for (const p of estado.prestamos) {
+    const estadoTexto = p.estado === 'activo' && p.vencido ? 'vencido' : p.estado;
+    const fila = document.createElement('tr');
+    fila.innerHTML = `
+      <td><b>${p.usuario.nombre}</b><br><span class="mono" style="font-size:11.5px;color:#5A6660">${p.usuario.legajo}</span></td>
+      <td>${p.item.nombre}<br><span style="font-size:11.5px;color:#5A6660">Casillero ${p.casillero.codigo}</span></td>
+      <td class="num">${p.cantidad}${p.cantidadDevuelta && p.estado === 'activo' ? `<br><span style="font-size:11px;font-weight:400;color:#5A6660">${p.cantidadDevuelta} dev.</span>` : ''}</td>
+      <td class="fechas">${fecha(p.retiradoEn)}</td>
+      <td class="fechas">${fecha(p.devueltoEn)}</td>
+      <td class="fechas">${p.resueltoPor || '—'}${p.motivoRechazo ? `<br><span style="font-size:11px">${p.motivoRechazo}</span>` : ''}</td>
+      <td><span class="pastilla" data-estado="${estadoTexto}">${estadoTexto}</span></td>
+      <td>${p.estado === 'activo' ? '<button class="accion-tabla">Registrar devolución</button>' : ''}</td>`;
+    fila.querySelector('.accion-tabla')?.addEventListener('click', () => devolucionMostrador(p));
+    cuerpo.appendChild(fila);
+  }
+}
+
+function dibujarPersonas() {
+  const cuerpo = $('cuerpoPersonas');
+  if (!estado.personas.length) {
+    cuerpo.innerHTML = '<tr><td colspan="5" class="vacio">No hay personas registradas</td></tr>';
+    return;
+  }
+  cuerpo.innerHTML = '';
+  for (const persona of estado.personas) {
+    const fila = document.createElement('tr');
+    fila.style.opacity = persona.activo ? '1' : '.45';
+    fila.innerHTML = `
+      <td class="num">${persona.legajo}</td>
+      <td>${persona.nombre}</td>
+      <td><span class="pastilla" data-rol="${persona.rol}">${persona.rol}</span></td>
+      <td class="num">${persona.unidades_afuera || 0}</td>
+      <td>${persona.activo ? '<button class="accion-tabla">Dar de baja</button>' : ''}</td>`;
+    fila.querySelector('.accion-tabla')?.addEventListener('click', () => bajaPersona(persona));
+    cuerpo.appendChild(fila);
+  }
+}
+
+/* ---------- Acciones ---------- */
+
+/** Aprobar: acá es donde nace la orden de apertura del casillero. */
+async function aprobar(solicitud) {
+  try {
+    if (estado.demo) demoAprobar(solicitud);
+    else await api(`/admin/solicitudes/${solicitud.id}/aprobar`, { method: 'POST' });
+    await refrescar();
+  } catch (error) { alert(error.message); }
+}
+
+/** Rechazar: libera la reserva y el motivo le llega a la persona. */
+async function rechazar(solicitud) {
+  const motivo = prompt(
+    `Rechazar el pedido de ${solicitud.usuario.nombre} (${solicitud.cantidad} × ${solicitud.item.nombre}).\n` +
+    `El motivo se le muestra a la persona. Podés dejarlo vacío.`, '');
+  if (motivo === null) return;   // canceló
+  try {
+    if (estado.demo) demoRechazar(solicitud, motivo);
+    else await api(`/admin/solicitudes/${solicitud.id}/rechazar`, {
+      method: 'POST', body: JSON.stringify({ motivo: motivo || null }),
+    });
+    await refrescar();
+  } catch (error) { alert(error.message); }
+}
+$('formInventario').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const casilleroId = Number($('invCasillero').value);
+  const cuerpo = {
+    itemId: Number($('invItem').value),
+    stockTotal: Number($('invTotal').value),
+    umbralBajo: Number($('invUmbral').value),
+  };
+  try {
+    if (estado.demo) demoInventario(casilleroId, cuerpo);
+    else await api(`/admin/casilleros/${casilleroId}/inventario`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    mostrarAviso($('avisoInventario'), 'Inventario actualizado', 'ok');
+    await refrescar();
+  } catch (error) { mostrarAviso($('avisoInventario'), error.message, 'error'); }
+});
+
+async function reponerStock(casillero) {
+  const respuesta = prompt(`Reposición en ${casillero.codigo}.\nCuántas unidades sumar (o restar con signo −):`, '5');
+  if (respuesta === null) return;
+  const delta = Number(respuesta);
+  if (!Number.isInteger(delta) || delta === 0) { alert('Ingresá un número entero distinto de cero.'); return; }
+  try {
+    if (estado.demo) demoInventario(casillero.id, {
+      itemId: casillero.item?.id, stockTotal: casillero.inventario.total + delta,
+      umbralBajo: casillero.inventario.umbralBajo });
+    else await api(`/admin/casilleros/${casillero.id}/reposicion`, { method: 'POST', body: JSON.stringify({ delta }) });
+    await refrescar();
+  } catch (error) { alert(error.message); }
+}
+
+async function aperturaEmergencia(casillero) {
+  if (!confirm(`¿Abrir ${casillero.codigo} sin registrar préstamo?\nQueda en la bitácora a tu nombre.`)) return;
+  try {
+    if (estado.demo) demoAbrir(casillero.id);
+    else await api(`/admin/casilleros/${casillero.id}/apertura-emergencia`, { method: 'POST' });
+    await refrescar();
+  } catch (error) { alert(error.message); }
+}
+
+async function reponerServicio(casillero) {
+  try {
+    if (estado.demo) { const c = estado.casilleros.find((x) => x.id === casillero.id);
+      c.estado = c.inventario.disponible ? 'DISPONIBLE' : 'SIN_STOCK'; c.detalleError = null; dibujarGabinete(); }
+    else await api(`/admin/casilleros/${casillero.id}/reponer-servicio`, { method: 'POST' });
+    await refrescar();
+  } catch (error) { alert(error.message); }
+}
+
+async function devolucionMostrador(prestamo) {
+  const respuesta = prompt(`Devolución por mostrador de ${prestamo.usuario.nombre}.\n¿Cuántas unidades? (1 a ${prestamo.pendiente})`, prestamo.pendiente);
+  if (respuesta === null) return;
+  const cantidad = Number(respuesta);
+  if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > prestamo.pendiente) {
+    alert(`Ingresá un número entre 1 y ${prestamo.pendiente}.`); return;
+  }
+  try {
+    if (estado.demo) demoDevolucion(prestamo, cantidad);
+    else await api(`/admin/prestamos/${prestamo.id}/devolucion`, { method: 'POST', body: JSON.stringify({ cantidad }) });
+    await Promise.all([cargarPrestamos(), refrescar()]);
+  } catch (error) { alert(error.message); }
+}
+
+$('buscarPrestamo').addEventListener('input', () => estado.demo ? dibujarPrestamos() : cargarPrestamos());
+$('filtroEstado').addEventListener('change', () => estado.demo ? dibujarPrestamos() : cargarPrestamos());
+$('buscarPersona').addEventListener('input', () => estado.demo ? dibujarPersonas() : cargarPersonas());
+
+$('formPersona').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const cuerpo = {
+    legajo: $('pLegajo').value.trim(), nombre: $('pNombre').value.trim(),
+    pin: $('pPin').value.trim(), rol: $('pRol').value,
+  };
+  try {
+    if (estado.demo) demoPersona(cuerpo);
+    else await api('/admin/usuarios', { method: 'POST', body: JSON.stringify(cuerpo) });
+    mostrarAviso($('avisoPersona'), `${cuerpo.nombre} quedó registrado con el legajo ${cuerpo.legajo}`, 'ok');
+    $('formPersona').reset();
+    await cargarPersonas();
+  } catch (error) { mostrarAviso($('avisoPersona'), error.message, 'error'); }
+});
+
+$('formImportar').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const resultado = estado.demo
+      ? demoImportar($('textoImportar').value)
+      : await api('/admin/usuarios/importar', { method: 'POST', body: JSON.stringify({ texto: $('textoImportar').value }) });
+    const detalle = [`${resultado.creados} alta(s), ${resultado.reactivados} reactivada(s)`]
+      .concat(resultado.errores.length ? ['', 'No se pudieron cargar:', ...resultado.errores] : []).join('\n');
+    mostrarAviso($('avisoImportar'), detalle, resultado.errores.length ? 'error' : 'ok');
+    if (!resultado.errores.length) $('textoImportar').value = '';
+    await cargarPersonas();
+  } catch (error) { mostrarAviso($('avisoImportar'), error.message, 'error'); }
+});
+
+async function bajaPersona(persona) {
+  if (!confirm(`¿Dar de baja a ${persona.nombre}?\nSe conserva todo su historial de préstamos.`)) return;
+  try {
+    if (estado.demo) persona.activo = 0;
+    else await api(`/admin/usuarios/${persona.id}`, { method: 'DELETE' });
+    await cargarPersonas();
+  } catch (error) { alert(error.message); }
+}
+
+/* ============================================================
+   MODO DEMO
+   ============================================================ */
+const nodoDemo = { codigo: 'NODO-A', ubicacion: 'Pañol planta baja', rssi: -74, offline: false };
+
+function cargarDemo() {
+  const casillero = (id, codigo, item, categoria, total, prestado, umbral, estadoPuerta = 'cerrada', operativo = 'ok') => ({
+    id, codigo, estado: operativo === 'error' ? 'ERROR'
+      : estadoPuerta === 'abierta' ? 'PUERTA_ABIERTA'
+      : total - prestado === 0 ? 'SIN_STOCK' : 'DISPONIBLE',
+    estadoPuerta, detalleError: operativo === 'error' ? 'Puerta abierta hace más de 120 s' : null,
+    nodo: nodoDemo, item: { id, nombre: item, categoria, unidad: 'unidad' },
+    inventario: { total, prestado, reservado: 0, disponible: total - prestado, umbralBajo: umbral,
+      stockBajo: total - prestado > 0 && total - prestado <= umbral },
+  });
+
+  estado.casilleros = [
+    casillero(1, 'A-01', 'Notebook Lenovo 14"', 'Informática', 25, 5, 5),
+    casillero(2, 'A-02', 'Zapatilla 5 tomas 5 m', 'Electricidad', 10, 8, 2),
+    casillero(3, 'A-03', 'Fibrón para pizarra', 'Aula', 50, 0, 10, 'abierta'),
+    casillero(4, 'A-04', 'Kit Arduino UNO', 'Electrónica', 12, 12, 3),
+  ];
+  estado.items = [
+    { id: 1, codigo: 'NB-14', nombre: 'Notebook Lenovo 14"' },
+    { id: 2, codigo: 'ZAP-5M', nombre: 'Zapatilla 5 tomas 5 m' },
+    { id: 3, codigo: 'FIB-PIZ', nombre: 'Fibrón para pizarra' },
+    { id: 4, codigo: 'KIT-ARD', nombre: 'Kit Arduino UNO' },
+  ];
+  estado.solicitudes = [
+    { id: 101, estado: 'pendiente', cantidad: 2, cantidadDevuelta: 0, pendiente: 2,
+      solicitadoEn: new Date(Date.now() - 42e4).toISOString(), minutosEsperando: 7,
+      retiradoEn: null, vencimiento: null, devueltoEn: null, resueltoPor: null, motivoRechazo: null,
+      item: { nombre: 'Notebook Lenovo 14"', unidad: 'unidad' }, casillero: { id: 1, codigo: 'A-01' },
+      usuario: { legajo: '10235', nombre: 'Giménez, Lucía', rol: 'alumno' } },
+    { id: 102, estado: 'pendiente', cantidad: 3, cantidadDevuelta: 0, pendiente: 3,
+      solicitadoEn: new Date(Date.now() - 9e4).toISOString(), minutosEsperando: 1,
+      retiradoEn: null, vencimiento: null, devueltoEn: null, resueltoPor: null, motivoRechazo: null,
+      item: { nombre: 'Fibrón para pizarra', unidad: 'unidad' }, casillero: { id: 3, codigo: 'A-03' },
+      usuario: { legajo: '20011', nombre: 'Ing. Sosa, Martín', rol: 'docente' } },
+  ];
+  estado.prestamos = [
+    ...estado.solicitudes,
+    { id: 91, estado: 'activo', vencido: false, cantidad: 5, cantidadDevuelta: 0, pendiente: 5,
+      retiradoEn: new Date(Date.now() - 54e5).toISOString(), vencimiento: new Date(Date.now() + 79e6).toISOString(), devueltoEn: null,
+      item: { nombre: 'Notebook Lenovo 14"', unidad: 'unidad' }, casillero: { id: 1, codigo: 'A-01' },
+      usuario: { legajo: '10234', nombre: 'Bertola, Juan', rol: 'alumno' }, resueltoPor: 'alumnado' },
+    { id: 92, estado: 'activo', vencido: true, cantidad: 8, cantidadDevuelta: 0, pendiente: 8,
+      retiradoEn: new Date(Date.now() - 9e8).toISOString(), vencimiento: new Date(Date.now() - 3e8).toISOString(), devueltoEn: null,
+      item: { nombre: 'Zapatilla 5 tomas 5 m', unidad: 'unidad' }, casillero: { id: 2, codigo: 'A-02' },
+      usuario: { legajo: '20011', nombre: 'Ing. Sosa, Martín', rol: 'docente' } },
+    { id: 93, estado: 'activo', vencido: false, cantidad: 12, cantidadDevuelta: 0, pendiente: 12,
+      retiradoEn: new Date(Date.now() - 18e5).toISOString(), vencimiento: new Date(Date.now() + 6e8).toISOString(), devueltoEn: null,
+      item: { nombre: 'Kit Arduino UNO', unidad: 'kit' }, casillero: { id: 4, codigo: 'A-04' },
+      usuario: { legajo: '20011', nombre: 'Ing. Sosa, Martín', rol: 'docente' } },
+    { id: 88, estado: 'devuelto', vencido: false, cantidad: 2, cantidadDevuelta: 2, pendiente: 0,
+      retiradoEn: new Date(Date.now() - 26e7).toISOString(), vencimiento: new Date(Date.now() - 17e7).toISOString(),
+      devueltoEn: new Date(Date.now() - 20e7).toISOString(),
+      item: { nombre: 'Fibrón para pizarra', unidad: 'unidad' }, casillero: { id: 3, codigo: 'A-03' },
+      usuario: { legajo: '10235', nombre: 'Giménez, Lucía', rol: 'alumno' } },
+  ];
+  estado.personas = [
+    { id: 1, legajo: '10234', nombre: 'Bertola, Juan', rol: 'alumno', activo: 1, unidades_afuera: 5 },
+    { id: 2, legajo: '10235', nombre: 'Giménez, Lucía', rol: 'alumno', activo: 1, unidades_afuera: 0 },
+    { id: 3, legajo: '20011', nombre: 'Ing. Sosa, Martín', rol: 'docente', activo: 1, unidades_afuera: 20 },
+  ];
+  estado.eventos = [
+    { creado_en: new Date(Date.now() - 6e4).toISOString(), casillero: 'A-03', tipo: 'PUERTA_ABIERTA', actor: 'microswitch', detalle: null },
+    { creado_en: new Date(Date.now() - 9e4).toISOString(), casillero: 'A-01', tipo: 'RETIRO', actor: '10234', detalle: '5 x Notebook Lenovo 14"' },
+    { creado_en: new Date(Date.now() - 18e5).toISOString(), casillero: 'A-04', tipo: 'RETIRO', actor: '20011', detalle: '12 x Kit Arduino UNO' },
+  ];
+  aplicarReservasDemo();
+  recalcularResumenDemo();
+  dibujarTodo();
+}
+
+/** En demo, las solicitudes pendientes descuentan disponible igual que en el server. */
+function aplicarReservasDemo() {
+  for (const c of estado.casilleros) c.inventario.reservado = 0;
+  for (const s of estado.solicitudes) {
+    const c = estado.casilleros.find((x) => x.id === s.casillero.id);
+    if (!c) continue;
+    c.inventario.reservado += s.cantidad;
+    c.inventario.disponible = Math.max(0, c.inventario.total - c.inventario.prestado - c.inventario.reservado);
+    c.estado = c.inventario.disponible === 0 && c.estado === 'DISPONIBLE' ? 'SIN_STOCK' : c.estado;
+  }
+}
+
+function demoAprobar(solicitud) {
+  estado.solicitudes = estado.solicitudes.filter((s) => s.id !== solicitud.id);
+  const p = estado.prestamos.find((x) => x.id === solicitud.id);
+  Object.assign(p, {
+    estado: 'activo', vencido: false, retiradoEn: new Date().toISOString(),
+    vencimiento: new Date(Date.now() + 864e5).toISOString(), resueltoPor: 'alumnado',
+  });
+  const c = estado.casilleros.find((x) => x.id === solicitud.casillero.id);
+  if (c) c.inventario.prestado += solicitud.cantidad;
+  estado.eventos.unshift({ creado_en: new Date().toISOString(), casillero: solicitud.casillero.codigo,
+    tipo: 'SOLICITUD_APROBADA', actor: 'alumnado', detalle: `${solicitud.cantidad} x ${solicitud.item.nombre}` });
+  demoAbrir(solicitud.casillero.id);
+  aplicarReservasDemo();
+  recalcularResumenDemo();
+}
+
+function demoRechazar(solicitud, motivo) {
+  estado.solicitudes = estado.solicitudes.filter((s) => s.id !== solicitud.id);
+  const p = estado.prestamos.find((x) => x.id === solicitud.id);
+  Object.assign(p, { estado: 'rechazado', resueltoPor: 'alumnado', motivoRechazo: motivo || null });
+  estado.eventos.unshift({ creado_en: new Date().toISOString(), casillero: solicitud.casillero.codigo,
+    tipo: 'SOLICITUD_RECHAZADA', actor: 'alumnado', detalle: motivo || null });
+  aplicarReservasDemo();
+  recalcularResumenDemo();
+}
+
+function recalcularResumenDemo() {
+  const activos = estado.prestamos.filter((p) => p.estado === 'activo');
+  estado.resumen = {
+    solicitudesPendientes: estado.solicitudes.length,
+    prestamosActivos: activos.length,
+    unidadesAfuera: activos.reduce((total, p) => total + p.pendiente, 0),
+    vencidos: activos.filter((p) => p.vencido).length,
+  };
+}
+
+function demoInventario(casilleroId, { itemId, stockTotal, umbralBajo }) {
+  const c = estado.casilleros.find((x) => x.id === casilleroId);
+  const item = estado.items.find((i) => i.id === itemId);
+  if (stockTotal < c.inventario.prestado)
+    throw new Error(`Hay ${c.inventario.prestado} unidades prestadas: el total no puede ser menor`);
+  c.item = { id: item.id, nombre: item.nombre, categoria: c.item?.categoria || 'General', unidad: 'unidad' };
+  c.inventario = { total: stockTotal, prestado: c.inventario.prestado,
+    disponible: stockTotal - c.inventario.prestado, umbralBajo,
+    stockBajo: stockTotal - c.inventario.prestado > 0 && stockTotal - c.inventario.prestado <= umbralBajo };
+  c.estado = c.inventario.disponible === 0 ? 'SIN_STOCK' : 'DISPONIBLE';
+}
+
+function demoAbrir(id) {
+  const c = estado.casilleros.find((x) => x.id === id);
+  estado.eventos.unshift({ creado_en: new Date().toISOString(), casillero: c.codigo,
+    tipo: 'APERTURA_EMERGENCIA', actor: 'alumnado', detalle: null });
+  setTimeout(() => { c.estado = 'PUERTA_ABIERTA'; c.estadoPuerta = 'abierta'; dibujarGabinete(); dibujarBitacora(); }, 1500);
+}
+
+function demoDevolucion(prestamo, cantidad) {
+  const p = estado.prestamos.find((x) => x.id === prestamo.id);
+  p.cantidadDevuelta += cantidad;
+  p.pendiente -= cantidad;
+  if (p.pendiente === 0) { p.estado = 'devuelto'; p.vencido = false; p.devueltoEn = new Date().toISOString(); }
+  const c = estado.casilleros.find((x) => x.id === p.casillero.id);
+  if (c) {
+    c.inventario.prestado -= cantidad;
+    c.inventario.disponible += cantidad;
+    c.inventario.stockBajo = c.inventario.disponible > 0 && c.inventario.disponible <= c.inventario.umbralBajo;
+    if (c.estado === 'SIN_STOCK') c.estado = 'DISPONIBLE';
+  }
+  estado.eventos.unshift({ creado_en: new Date().toISOString(), casillero: p.casillero.codigo,
+    tipo: 'DEVOLUCION', actor: 'alumnado', detalle: `${cantidad} x ${p.item.nombre}` });
+  recalcularResumenDemo();
+  dibujarGabinete();
+}
+
+function demoPersona({ legajo, nombre, pin, rol }) {
+  if (!/^\d{3,10}$/.test(legajo)) throw new Error('El legajo tiene que ser un número de 3 a 10 dígitos');
+  if (!/^\d{4,6}$/.test(pin)) throw new Error('El PIN tiene que ser de 4 a 6 dígitos');
+  if (estado.personas.some((p) => p.legajo === legajo)) throw new Error(`El legajo ${legajo} ya está registrado`);
+  estado.personas.push({ id: Date.now(), legajo, nombre, rol, activo: 1, unidades_afuera: 0 });
+}
+
+function demoImportar(texto) {
+  const resultado = { creados: 0, reactivados: 0, errores: [] };
+  texto.split('\n').map((l) => l.trim()).filter(Boolean).forEach((linea, i) => {
+    const [legajo, nombre, pin, rol] = linea.split(/[,;\t]/).map((p) => p.trim());
+    try { demoPersona({ legajo, nombre, pin, rol: rol || 'alumno' }); resultado.creados++; }
+    catch (e) { resultado.errores.push(`Línea ${i + 1}: ${e.message}`); }
+  });
+  return resultado;
+}
+</script>
+</body>
+</html>
